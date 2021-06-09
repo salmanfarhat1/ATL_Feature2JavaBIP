@@ -1,0 +1,358 @@
+-- @path Feature_MM=/ATL_Feature_To_JavaBIP/MetaModels/Feature_MM.ecore.ecore
+-- @path JavaBIP_MM=/ATL_Feature_To_JavaBIP/MetaModels/JavaBIP_MM.ecore.ecore
+
+module Feature_M_To_JavaBIP_M;
+
+
+create OUT: JavaBIP_MM from IN: Feature_MM;
+
+
+
+-- ******************************************* Helper Number_of_SubFeatures  *********************************************************************************************************
+
+helper context Feature_MM!Feature def: Number_of_SubFeatures: String =
+	self.SubFeatures -> size().toString();
+	
+-- ******************************************* Helper isLeaf  *********************************************************************************************************
+
+
+helper context Feature_MM!Feature def: isLeaf(): Boolean =
+	if self.SubFeatures -> size() = 0
+	then
+		true
+	else
+		false
+endif;
+
+
+-- ******************************************* Helper isExclusive  *********************************************************************************************************
+
+helper context Feature_MM!Feature def: isExclusive: Boolean =
+	if self.oclIsTypeOf(Feature_MM!Exclusive)
+	then
+		true
+	else
+		false
+endif;
+
+
+helper context Feature_MM!Feature def: isRoot: Boolean =
+	if self.oclIsTypeOf(Feature_MM!Root)
+	then
+		true
+	else
+		false
+endif;
+
+
+
+-- ******************************************* Helper isAlternative  *********************************************************************************************************
+
+helper context Feature_MM!Feature def: isAlternative: String =
+	if self.oclIsTypeOf(Feature_MM!Alternative)
+	then
+		true.toString()
+	else
+		false.toString()
+endif;
+
+
+-- ******************************************* Helper isParentExist  *********************************************************************************************************
+
+helper context Feature_MM!Feature def: isParentExist: String =
+	if self.parent_name.oclIsUndefined()
+	then 
+		false.toString()
+	else 
+		true.toString()
+	endif;
+
+
+-- ******************************************* Helper Parent_Name  *********************************************************************************************************
+
+
+helper context Feature_MM!Feature def: Parent_Name: String =
+	if self.parent_name.oclIsUndefined()
+	then 
+		' Parent doesnt exist'.toString()
+	else 
+		self.parent_name.name.toString()
+	endif;
+
+
+
+-- ******************************************* Helper Number_of_SubFeatures  *********************************************************************************************************
+
+helper context Feature_MM!Feature def: list_of_leafs: String =
+	self.SubFeatures -> collect(e | e.name).toString(); --  <Component name="ASequence {'B', 'C', 'D'}"/> (selecting alternative subfeatures)	
+--	self.SubFeatures -> select(e | e.oclIsTypeOf(Feature_MM!Alternative)) -> collect(e | e.name).toString(); --  <Component name="ASequence {'B', 'C', 'D'}"/> (selecting alternative subfeatures)
+--	self.SubFeatures->asSequence().toString();          --  <Component name="ASequence {'IN!B', 'IN!C', 'IN!D'}"/>
+	
+
+
+-- ******************************************* Helper Creating map with a statess  *********************************************************************************************************
+
+helper def : CreateMapForStates : Map(OclAny, JavaBIP_MM!State_Base) =
+   JavaBIP_MM!State_Base.allInstances()->iterate(e; acc : Map(OclAny, JavaBIP_MM!State_Base) = Map{} |
+     acc.including(e.property, e)
+   );
+
+-- ******************************************* Helper IsEqual Strings  *********************************************************************************************************
+
+
+
+
+
+-- ******************************************* Rule FeatureToComponent and states   *********************************************************************************************************
+
+
+
+ helper def : Components_set : Set( JavaBIP_MM!Component) = Set{};
+ helper def : Connectors_set : Set( JavaBIP_MM!Connector_Motif) = Set{};
+  
+
+ helper def : elementsMap : Map(Feature_MM!Feature, JavaBIP_MM!Component) = Map{};
+
+
+rule FeatureToComponent_not_leaf {
+	from
+		s:Feature_MM!Feature (not s.isLeaf())
+	to 
+		o_1 : JavaBIP_MM!Component (
+			--name <- s.name +' children :' + s.list_of_leafs + ' is alternative ? -> ' + s.isAlternative + ' Is exclusive ? ->' + s.isExclusive.toString(),
+			name <- s.name,
+			states_link_to_State_Base <- o_2,
+			initial_s <- o_3,
+			connectors <- o_4
+			
+		),
+		o_2: distinct JavaBIP_MM!State_Base foreach(e in s.SubFeatures -> asSet()) (
+			state_name <- e.name
+			
+		),
+		o_3:  JavaBIP_MM!Initial_State (
+			state_name <- 'init' 
+		),
+		o_4: distinct JavaBIP_MM!Enforceable foreach(e in s.SubFeatures)(
+			transition_name <- 	'init_to_' + e.name, -- + ' String String _____ ' + o_1.states_link_to_State_Base -> asSet() -> select(l | l.state_name = e.name) -> collect(k | k.state_name ).toString(),
+			--description <- 'this is the port of the component: '+o_1.name + ' from state :' + o_1.states_link_to_State_Base -> asSet() -> select(l | l.state_name = e.name) -> collect(k | k ) -> first().state_name +' to state :' + o_2.state_name, 
+			dst <- o_1.states_link_to_State_Base -> asSet() -> select(l | l.state_name = e.name) -> collect(k | k ) -> first(),
+			src <- o_3
+		) 
+		 do {
+   		thisModule.elementsMap  <- thisModule.elementsMap->including(s, o_1);
+   		thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(s, o_4);
+   		thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s, o_4);
+		thisModule.Components_set <- thisModule.Components_set -> including(o_1);
+   		
+ 	}
+}
+
+
+ 
+rule FeatureToComponent_leaf {
+	from
+		s:Feature_MM!Feature (s.isLeaf() and (not s.isExclusive))
+	to 
+		o_1 : JavaBIP_MM!Component (
+			--name <- s.name +' children: ' + s.list_of_leafs + ' is alternative ? -> ' + s.isAlternative + ' Is exclusive ? ->' + s.isExclusive.toString() ,
+			name <- s.name,
+			states_link_to_State_Base <- o_2,
+			initial_s <- o_3,
+			connectors <- o_4 
+		),
+		o_2: JavaBIP_MM!State_Base (
+			state_name <- s.name
+			
+		),
+		o_3: JavaBIP_MM!Initial_State (
+			state_name <- 'init'
+		),
+		o_4:  JavaBIP_MM!Enforceable(
+			transition_name <- 	'init_to_' + o_2.state_name, 
+			dst <- o_2,
+			src <- o_3
+		)
+		
+	 do {
+   		thisModule.elementsMap  <- thisModule.elementsMap->including(s, o_1);
+   		thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(s, o_4);
+   		thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s, Sequence{o_4});
+	 	thisModule.Components_set <- thisModule.Components_set -> including(o_1);
+   		
+	 }
+}
+
+helper context Feature_MM!Feature def: ParentRef: Feature_MM!Feature  =
+	if self.parent_name.oclIsUndefined()
+	then 
+		self.oclIsUndefined()
+	else 
+		self.parent_name
+	endif;
+
+ helper def : AllPortsLeadsToStateX : Map( Feature_MM!Feature,JavaBIP_MM!Enforceable) = Map{};
+ 
+ helper def : MakeSet : Set( JavaBIP_MM!Connector_Motif_End) = Set{};
+ 
+ 
+
+ 
+-- rule ConstraintsImpliesTo_EnforceablePorts{
+--	from 
+--		s:Feature_MM!Implies (s.F_From.isLeaf())
+--	to 
+--
+--		o_1 : JavaBIP_MM!Connector_Motif (
+--			--transition_name <- s.F_From.name + '_To_'  + s.F_to.name +' parent name: ' + s.F_From.ParentRef.name
+--			--connector_id <- 'from state X to state ' + thisModule.elementsMap.get(s.F_From).states_link_to_State_Base -> collect(e | e.state_name).toString(), --+ ' , from state Y to state ' + thisModule.elementsMap.get(s.F_to).name,
+--			--connector_id <- thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name+'--------------' +thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e.transition_name).toString(),
+--			connector_id <- thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name + '___________'+thisModule.AllPortsLeadsToStateX.get(s.F_to).transition_name
+--			
+--		),
+	--	o_2: JavaBIP_MM!Synchron(
+--			one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first(),
+--			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
+--			description <- 'this is the port of the component: ' + thisModule.elementsMap.get(s.F_From).name + ' from state :' + thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first().dst.state_name
+--			
+--		),
+--		o_3: JavaBIP_MM!Trigger(
+--			one_enforceable <- thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first(),
+--			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
+--			description <- 'this is the port of the component: ' + thisModule.elementsMap.get(s.F_to).name + ' from state :' + thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first().dst.state_name
+--			
+--		)
+--		do{ -- to make o_2 as a sequence
+--			thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+--		
+--			o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+--			
+	--		thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+--			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+--			--o_1.connector_id <- 'asdasdsadadadadasdasd';
+--			for(r in thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k)) {
+--				--o_1.connector_id <- thisModule.elementsMap.get(s.F_From).connectors -> size().toString();
+--				thisModule.bam_to_bam(thisModule.elementsMap.get(s.F_From).connectors -> size().toString());
+--			}
+--		}
+		
+		
+--}
+ 
+--rule bam_to_bam(s: String) {
+--   to
+--     p : JavaBIP_MM!Component (
+--      name <- s
+--     )
+--}
+
+
+
+ helper def : ListOfConnectorsForComponents: Map( Feature_MM!Feature,JavaBIP_MM!Enforceable) = Map{};
+
+  rule ConstraintsImpliesTo_EnforceablePorts_not_leaf{
+	from 
+		s:Feature_MM!Implies (s.F_From.isExclusive and s.F_to.isExclusive)
+	to 
+
+		o_1 : JavaBIP_MM!Connector_Motif (
+			--transition_name <- s.F_From.name + '_To_'  + s.F_to.name +' parent name: ' + s.F_From.ParentRef.name
+			--connector_id <- 'from state X to state ' + thisModule.elementsMap.get(s.F_From).states_link_to_State_Base -> collect(e | e.state_name).toString(), --+ ' , from state Y to state ' + thisModule.elementsMap.get(s.F_to).name,
+			--connector_id <- thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name+'--------------' +thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e.transition_name).toString(),
+			connector_id <- thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k ) -> first().transition_name + '__________' +thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_to.name) )-> collect(k | k ) -> first().transition_name  --thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name + '___________'+thisModule.AllPortsLeadsToStateX.get(s.F_to).transition_name
+			
+		),
+		o_2: JavaBIP_MM!Synchron(
+			one_enforceable <- thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k ) -> first(),
+			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
+			description <- 'this is the port of the component: ' + s.F_From.parent_name.name + ' from state :' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k )-> first().src.state_name +' to state :' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k )-> first().dst.state_name
+			
+		),
+		o_3: JavaBIP_MM!Trigger(
+			one_enforceable <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_to.name) )-> collect(k | k ) -> first(),
+			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
+			description <- 'this is the port of the component: ' + s.F_to.parent_name.name + ' from state :' + thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_to.name) )-> collect(k | k )-> first().src.state_name +' to state :' + thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_to.name) )-> collect(k | k )-> first().dst.state_name
+			
+		)
+		do{ -- to make o_2 as a sequence
+			thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+			
+		
+			o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+			
+			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+			--o_1.connector_id <- 'asdasdsadadadadasdasd';
+			thisModule.Connectors_set <- thisModule.Connectors_set -> including(o_1);
+			
+		}
+}
+ 
+ 
+ 
+ 
+ rule ConstraintsImpliesTo_EnforceablePorts{
+	from 
+		s:Feature_MM!Implies (not s.F_From.isExclusive and not s.F_to.isExclusive)
+	to 
+
+		o_1 : JavaBIP_MM!Connector_Motif (
+			--transition_name <- s.F_From.name + '_To_'  + s.F_to.name +' parent name: ' + s.F_From.ParentRef.name
+			--connector_id <- 'from state X to state ' + thisModule.elementsMap.get(s.F_From).states_link_to_State_Base -> collect(e | e.state_name).toString(), --+ ' , from state Y to state ' + thisModule.elementsMap.get(s.F_to).name,
+			--connector_id <- thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name+'--------------' +thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e.transition_name).toString(),
+			connector_id <- thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name + '___________'+thisModule.AllPortsLeadsToStateX.get(s.F_to).transition_name
+			
+		),
+		o_2: JavaBIP_MM!Synchron(
+			one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first(),
+			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
+			description <- 'this is the port of the component: ' + thisModule.elementsMap.get(s.F_From).name + ' from state :' + thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first().dst.state_name
+			
+		),
+		o_3: JavaBIP_MM!Trigger(
+			one_enforceable <- thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first(),
+			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
+			description <- 'this is the port of the component: ' + thisModule.elementsMap.get(s.F_to).name + ' from state :' + thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first().dst.state_name
+			
+		)
+		do{ -- to make o_2 as a sequence
+			thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+			
+		
+			o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+			
+			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+			--o_1.connector_id <- 'asdasdsadadadadasdasd';
+			thisModule.Connectors_set <- thisModule.Connectors_set -> including(o_1);
+			for(r in thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k)) {
+				--o_1.connector_id <- thisModule.elementsMap.get(s.F_From).connectors -> size().toString();
+				thisModule.bam_to_bam(thisModule.elementsMap.get(s.F_From).connectors -> size().toString());
+			}
+		}
+		
+		
+}
+ 
+rule bam_to_bam(s: String) { -- a way to create components in the target model without a  source
+   to
+     p : JavaBIP_MM!Component (
+       name <- thisModule.ListOfConnectorsForComponents.toString()
+     )
+ }
+
+
+
+rule FeatureModelToJavaBIP {
+	from
+		s:Feature_MM!Feature_model 
+	to 
+		o_1 : JavaBIP_MM!Java_BIP_project (
+			components <- thisModule.Components_set,
+			connector_motifs <- thisModule.Connectors_set
+		)
+}
+
+
+
+
