@@ -25,6 +25,37 @@ helper context Feature_MM!Feature def: isLeaf(): Boolean =
 endif;
 
 
+-- ******************************************* Helper is the component will be used in the coordination  *********************************************************************************************************
+-- check whether a feature that is not a leaf wilol corresponds to a component that will be used in the model
+helper context Feature_MM!Feature def: isUsableComponent: String =
+	if self.SubFeatures -> first().isExclusive 
+	then
+		'true'  -- component will be used
+	else
+		'false'  -- component will not be used
+endif;
+
+
+helper context Feature_MM!Feature def: checkFeatureNature: String =
+	if self.SubFeatures -> first().isExclusive 
+	then
+		'and' -- parent of Or grp 
+		else
+			if self.SubFeatures -> first().isAlternativeBoolean
+			then
+				'or'  -- parent of And grp 
+			else
+				'normal' -- normal feature
+			endif
+endif;
+
+
+			
+	
+	
+
+
+
 -- ******************************************* Helper isExclusive  *********************************************************************************************************
 
 helper context Feature_MM!Feature def: isExclusive: Boolean =
@@ -35,6 +66,7 @@ helper context Feature_MM!Feature def: isExclusive: Boolean =
 		false
 endif;
 
+-- ******************************************* Helper is Root  *********************************************************************************************************
 
 helper context Feature_MM!Feature def: isRoot: Boolean =
 	if self.oclIsTypeOf(Feature_MM!Root)
@@ -54,6 +86,15 @@ helper context Feature_MM!Feature def: isAlternative: String =
 		true.toString()
 	else
 		false.toString()
+endif;
+
+
+helper context Feature_MM!Feature def: isAlternativeBoolean: Boolean =
+	if self.oclIsTypeOf(Feature_MM!Alternative)
+	then
+		true
+	else
+		false
 endif;
 
 
@@ -88,6 +129,9 @@ helper context Feature_MM!Feature def: list_of_leafs: String =
 --	self.SubFeatures -> select(e | e.oclIsTypeOf(Feature_MM!Alternative)) -> collect(e | e.name).toString(); --  <Component name="ASequence {'B', 'C', 'D'}"/> (selecting alternative subfeatures)
 --	self.SubFeatures->asSequence().toString();          --  <Component name="ASequence {'IN!B', 'IN!C', 'IN!D'}"/>
 	
+ 
+helper context Feature_MM!Feature def: IsImpliesConstraintDestinationState: String =
+	self.SubFeatures -> collect(e | e.name).toString(); --  <Component name="ASequence {'B', 'C', 'D'}"/> (selecting alternative subfeatures)	
 
 
 -- ******************************************* Helper Creating map with a statess  *********************************************************************************************************
@@ -113,6 +157,14 @@ helper def : CreateMapForStates : Map(OclAny, JavaBIP_MM!State_Base) =
 
  helper def : elementsMap : Map(Feature_MM!Feature, JavaBIP_MM!Component) = Map{};
 
+ 
+ -- ******************************************* Feature to component if not leaf   *********************************************************************************************************
+
+ 
+-- correspondsTo: is a attribute in the component class in JavaBIP metamodel that specifies the base of the feature 
+-- (correspondsTo:if it is parent of an Or:1
+--										And:0/
+--										normalFeature:-1)
 
 rule FeatureToComponent_not_leaf {
 	from
@@ -121,10 +173,11 @@ rule FeatureToComponent_not_leaf {
 		o_1 : JavaBIP_MM!Component (
 			--name <- s.name +' children :' + s.list_of_leafs + ' is alternative ? -> ' + s.isAlternative + ' Is exclusive ? ->' + s.isExclusive.toString(),
 			name <- s.name,
+			optional <- s.optional,
+			usableComponent <- s.isUsableComponent, 
+			correspondsTo <- s.checkFeatureNature, 
 			states_link_to_State_Base <- o_2,
-			initial_s <- o_3,
-			connectors <- o_4
-			
+			initial_s <- o_3	
 		),
 		o_2: distinct JavaBIP_MM!State_Base foreach(e in s.SubFeatures -> asSet()) (
 			state_name <- e.name
@@ -138,28 +191,40 @@ rule FeatureToComponent_not_leaf {
 			--description <- 'this is the port of the component: '+o_1.name + ' from state :' + o_1.states_link_to_State_Base -> asSet() -> select(l | l.state_name = e.name) -> collect(k | k ) -> first().state_name +' to state :' + o_2.state_name, 
 			dst <- o_1.states_link_to_State_Base -> asSet() -> select(l | l.state_name = e.name) -> collect(k | k ) -> first(),
 			src <- o_3
+		),
+		o_5: distinct JavaBIP_MM!Enforceable foreach(e in s.SubFeatures)(
+			transition_name <- 	  e.name+'_reset', -- + ' String String _____ ' + o_1.states_link_to_State_Base -> asSet() -> select(l | l.state_name = e.name) -> collect(k | k.state_name ).toString(),
+			--description <- 'this is the port of the component: '+o_1.name + ' from state :' + o_1.states_link_to_State_Base -> asSet() -> select(l | l.state_name = e.name) -> collect(k | k ) -> first().state_name +' to state :' + o_2.state_name, 
+			dst <- o_3,
+			src <- o_1.states_link_to_State_Base -> asSet() -> select(l | l.state_name = e.name) -> collect(k | k ) -> first()
 		) 
-		 do {
+	 do {
    		thisModule.elementsMap  <- thisModule.elementsMap->including(s, o_1);
    		thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(s, o_4);
-   		thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s, o_4);
-		thisModule.Components_set <- thisModule.Components_set -> including(o_1);
    		
+   		thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s, o_4 -> union(o_5));
+		thisModule.Components_set <- thisModule.Components_set -> including(o_1);
+   		o_1.connectors <- o_4 -> union(o_5)  ;
  	}
 }
 
 
+-- ******************************************* Feature to component if leaf   *********************************************************************************************************
  
 rule FeatureToComponent_leaf {
 	from
 		s:Feature_MM!Feature (s.isLeaf() and (not s.isExclusive))
 	to 
 		o_1 : JavaBIP_MM!Component (
-			--name <- s.name +' children: ' + s.list_of_leafs + ' is alternative ? -> ' + s.isAlternative + ' Is exclusive ? ->' + s.isExclusive.toString() ,
-			name <- s.name,
+			--name < - s.name +' children: ' + s.list_of_leafs + ' is alternative ? -> ' + s.isAlternative + ' Is exclusive ? ->' + s.isExclusive.toString() ,
+			
+			name <- s.name ,
+			optional <- s.optional,
+			usableComponent <- 'true', 
+			correspondsTo <- 'normal',
 			states_link_to_State_Base <- o_2,
-			initial_s <- o_3,
-			connectors <- o_4 
+			initial_s <- o_3
+--			connectors <- o_4
 		),
 		o_2: JavaBIP_MM!State_Base (
 			state_name <- s.name
@@ -172,16 +237,27 @@ rule FeatureToComponent_leaf {
 			transition_name <- 	'init_to_' + o_2.state_name, 
 			dst <- o_2,
 			src <- o_3
+		),
+		o_5:  JavaBIP_MM!Enforceable(
+			transition_name <- 	  o_2.state_name + '_reset', 
+			dst <- o_3,
+			src <- o_2
 		)
 		
 	 do {
    		thisModule.elementsMap  <- thisModule.elementsMap->including(s, o_1);
    		thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(s, o_4);
-   		thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s, Sequence{o_4});
+   		thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(s, o_5);
+   		
+   		thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s, Sequence{o_4, o_5}); -- , thisModule.resolveTemp(s.linkToClassB, 'o_4')
+--   		thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s, Sequence{o_5});
+   		o_1.connectors <- thisModule.ListOfConnectorsForComponents.get(s);
 	 	thisModule.Components_set <- thisModule.Components_set -> including(o_1);
    		
 	 }
 }
+
+
 
 helper context Feature_MM!Feature def: ParentRef: Feature_MM!Feature  =
 	if self.parent_name.oclIsUndefined()
@@ -250,35 +326,88 @@ helper context Feature_MM!Feature def: ParentRef: Feature_MM!Feature  =
 
  helper def : ListOfConnectorsForComponents: Map( Feature_MM!Feature,JavaBIP_MM!Enforceable) = Map{};
 
-  rule ConstraintsImpliesTo_EnforceablePorts_not_leaf{
+  rule ConstraintsImpliesTo_EnforceablePorts_not_leaf{ -- and to and 
 	from 
-		s:Feature_MM!Implies (s.F_From.isExclusive and s.F_to.isExclusive)
+		s:Feature_MM!Implies (s.F_From.isExclusive and s.F_to.isExclusive) -- and to and 
 	to 
 
 		o_1 : JavaBIP_MM!Connector_Motif (
 			--transition_name <- s.F_From.name + '_To_'  + s.F_to.name +' parent name: ' + s.F_From.ParentRef.name
 			--connector_id <- 'from state X to state ' + thisModule.elementsMap.get(s.F_From).states_link_to_State_Base -> collect(e | e.state_name).toString(), --+ ' , from state Y to state ' + thisModule.elementsMap.get(s.F_to).name,
 			--connector_id <- thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name+'--------------' +thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e.transition_name).toString(),
-			connector_id <- thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k ) -> first().transition_name + '__________' +thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_to.name) )-> collect(k | k ) -> first().transition_name  --thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name + '___________'+thisModule.AllPortsLeadsToStateX.get(s.F_to).transition_name
+			connector_id <-'Implies_' +  thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+				-> collect(k | k ) 
+				-> first().transition_name + '__________' +thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k ) 
+				-> first().transition_name  
+			--thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name + '___________'+thisModule.AllPortsLeadsToStateX.get(s.F_to).transition_name
 			
 		),
 		o_2: JavaBIP_MM!Synchron(
-			one_enforceable <- thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k ) -> first(),
-			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
-			description <- 'this is the port of the component: ' + s.F_From.parent_name.name + ' from state :' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k )-> first().src.state_name +' to state :' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k )-> first().dst.state_name
+			one_enforceable <- thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) ->
+				select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k ) -> first(),
+			
+				--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
+			
+			description <- 'this is the port of the component: ' + s.F_From.parent_name.name + 
+				' from state :' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k )
+				-> first().src.state_name +' to state :' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+				->select(l | l.transition_name = ('init_to_'+s.F_From.name) )-> collect(k | k )-> first().dst.state_name
 			
 		),
-		o_3: JavaBIP_MM!Trigger(
-			one_enforceable <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_to.name) )-> collect(k | k ) -> first(),
-			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
-			description <- 'this is the port of the component: ' + s.F_to.parent_name.name + ' from state :' + thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_to.name) )-> collect(k | k )-> first().src.state_name +' to state :' + thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> select(l | l.transition_name = ('init_to_'+s.F_to.name) )-> collect(k | k )-> first().dst.state_name
+		o_4:  JavaBIP_MM!Enforceable(
+			transition_name <- 	s.F_to.name +'_to_' + s.F_to.name,
+		 -- o_4.transition_name <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name)-> collect(k | k.transition_name ).toString();
 			
+			src <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name )
+				->select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k )
+				-> first().dst,
+			dst <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name)
+				->select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k )
+				-> first().dst
+			
+			
+		),
+		o_3: JavaBIP_MM!Trigger(	
+				one_enforceable <- o_4,
+
+				description <- 'this is the port of the component: ' + s.F_to.parent_name.name + 
+					' from state :' + o_4.src.state_name +' to state :' +o_4.src.state_name
+			
+		),
+		o_5: JavaBIP_MM!Guard(
+			name <- 'Implies___srcComponent:'+   s.F_From.parent_name.name+'___dstComponnt:'+ s.F_to.parent_name.name,
+			guardMethod <- 'srcFeature:'+   s.F_From.name + '___dstFeature:' + s.F_to.name+ '___srcTransition:'+thisModule.elementsMap.get(s.F_From.parent_name).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				->collect(e | e) 
+				-> first().transition_name + '___dstTransition:'+ o_4.transition_name 
+		
 		)
 		do{ -- to make o_2 as a sequence
+			
+			
+			o_1.connector_id <- 'Implies_' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+				-> collect(k | k ) 
+				-> first().transition_name + '__________' +o_4.transition_name;
+		
 			thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
 			
 		
 			o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+			
+			thisModule.elementsMap.get(s.F_to.parent_name).connectors <-Set{o_4};
+			thisModule.elementsMap.get(s.F_to.parent_name).guards <- Set{o_5};
+			-- thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(thisModule.elementsMap.get(s.F_to.parent_name), o_4);
+			
+			thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s.F_to.parent_name, thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> union(Sequence{o_4}) ); -- , thisModule.resolveTemp(s.linkToClassB, 'o_4')
+			
+			
 			
 			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
 			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
@@ -293,33 +422,85 @@ helper context Feature_MM!Feature def: ParentRef: Feature_MM!Feature  =
  
  rule ConstraintsImpliesTo_EnforceablePorts{
 	from 
-		s:Feature_MM!Implies (not s.F_From.isExclusive and not s.F_to.isExclusive)
+		s:Feature_MM!Implies (not s.F_From.isExclusive and not s.F_to.isExclusive) -- or to or 
 	to 
 
 		o_1 : JavaBIP_MM!Connector_Motif (
-			--transition_name <- s.F_From.name + '_To_'  + s.F_to.name +' parent name: ' + s.F_From.ParentRef.name
-			--connector_id <- 'from state X to state ' + thisModule.elementsMap.get(s.F_From).states_link_to_State_Base -> collect(e | e.state_name).toString(), --+ ' , from state Y to state ' + thisModule.elementsMap.get(s.F_to).name,
-			--connector_id <- thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name+'--------------' +thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e.transition_name).toString(),
-			connector_id <- thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name + '___________'+thisModule.AllPortsLeadsToStateX.get(s.F_to).transition_name
+			connector_id <- 'Implies_' + thisModule.AllPortsLeadsToStateX.get(s.F_From).transition_name 
+				+ '__________'+thisModule.AllPortsLeadsToStateX.get(s.F_to).transition_name
 			
 		),
 		o_2: JavaBIP_MM!Synchron(
-			one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first(),
-			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
-			description <- 'this is the port of the component: ' + thisModule.elementsMap.get(s.F_From).name + ' from state :' + thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) ->collect(e | e) -> first().dst.state_name
+			one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				->collect(e | e) 
+				-> first(),
+			
+			
+			description <- 'this is the port of the component: ' + thisModule.elementsMap.get(s.F_From).name +
+				' from state :' + thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				->collect(e | e) 
+				-> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				->collect(e | e) 
+				-> first().dst.state_name
 			
 		),
-		o_3: JavaBIP_MM!Trigger(
-			one_enforceable <- thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first(),
-			--one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors -> select(e | e.dst.state_name = s.F_From.name) -> collect(k | k.transition_name).toString()
-			description <- 'this is the port of the component: ' + thisModule.elementsMap.get(s.F_to).name + ' from state :' + thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.F_to).connectors -> select(e | e.dst.state_name = s.F_to.name) ->collect(e | e) -> first().dst.state_name
+		o_4:  JavaBIP_MM!Enforceable(
+			transition_name <- 	s.F_to.name +'_to_' + s.F_to.name,
+		 -- o_4.transition_name <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name)-> collect(k | k.transition_name ).toString();
 			
+			src <- thisModule.ListOfConnectorsForComponents.get(s.F_to)
+				->select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k )
+				-> first().dst,
+			dst <- thisModule.ListOfConnectorsForComponents.get(s.F_to)
+				->select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k )
+				-> first().dst
+			
+			
+		),
+		o_3: JavaBIP_MM!Trigger(		
+				one_enforceable <- o_4,
+
+				description <- 'this is the port of the component: ' + s.F_to.name + 
+					' from state :' + o_4.src.state_name +' to state :' +o_4.src.state_name
+				
+			
+		),
+		o_5: JavaBIP_MM!Guard(
+			name <- 'Implies___srcComponent:'+   s.F_From.name+'___dstComponnt:'+ s.F_to.name,
+			guardMethod <- 'srcFeature:'+   s.F_From.name + '___dstFeature:' + s.F_to.name+ '___srcTransition:'+thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				->collect(e | e) 
+				-> first().transition_name + '___dstTransition:'+ o_4.transition_name 
+		
 		)
+		
 		do{ -- to make o_2 as a sequence
+		
+			o_1.connector_id <- 'Implies_' + thisModule.ListOfConnectorsForComponents.get(s.F_From) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+				-> collect(k | k ) 
+				-> first().transition_name + '__________' +o_4.transition_name;
+		
+		
 			thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
 			
 		
 			o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+			
+			
+			
+			thisModule.elementsMap.get(s.F_to).connectors <-Set{o_4};
+			thisModule.elementsMap.get(s.F_to).guards <- Set{o_5};
+			-- thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(thisModule.elementsMap.get(s.F_to.parent_name), o_4);
+			
+			thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s.F_to, thisModule.ListOfConnectorsForComponents.get(s.F_to) -> union(Sequence{o_4}) ); -- , thisModule.resolveTemp(s.linkToClassB, 'o_4')
+			
+			
 			
 			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
 			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
@@ -334,12 +515,379 @@ helper context Feature_MM!Feature def: ParentRef: Feature_MM!Feature  =
 		
 }
  
+ 
+ rule ConstraintsImpliesTo_EnforceablePorts_OR_to_AND{ -- or to and 
+	from 
+		s:Feature_MM!Implies (not s.F_From.isExclusive and s.F_to.isExclusive)  -- s.F_From.isExclusive-> and group 
+	to 
+
+		o_1 : JavaBIP_MM!Connector_Motif (
+			connector_id <- 'Implies_' + thisModule.ListOfConnectorsForComponents.get(s.F_From) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+				-> collect(k | k ) 
+				-> first().transition_name + '__________' +thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k ) 
+				-> first().transition_name 
+			
+		),
+		o_2: JavaBIP_MM!Synchron(		
+			one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				->collect(e | e) 
+				-> first(),
+
+			description <- 'this is the port of the component: ' + thisModule.elementsMap.get(s.F_From).name +
+				' from state :' + thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				-> collect(e | e) 
+				-> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				-> collect(e | e) 
+				-> first().dst.state_name
+		),
+		o_4:  JavaBIP_MM!Enforceable(
+			transition_name <- 	s.F_to.name +'_to_' + s.F_to.name,
+		 -- o_4.transition_name <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name)-> collect(k | k.transition_name ).toString();
+			
+			src <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name)
+				->select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k )
+				-> first().dst,
+			dst <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name)
+				->select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k )
+				-> first().dst
+			
+			
+		),
+		o_3: JavaBIP_MM!Trigger(
+			one_enforceable <- o_4,
+
+			description <- 'this is the port of the component: ' + s.F_to.parent_name.name + 
+				' from state :' + o_4.src.state_name +' to state :' +o_4.src.state_name
+		),
+		o_5: JavaBIP_MM!Guard(
+			name <- 'Implies___srcComponent:'+   s.F_From.name+'___dstComponnt:'+ s.F_to.parent_name.name,
+			guardMethod <- 'srcFeature:'+   s.F_From.name + '___dstFeature:' + s.F_to.name+ '___srcTransition:'+thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				->collect(e | e) 
+				-> first().transition_name + '___dstTransition:'+ o_4.transition_name 
+		
+		)
+
+		do{ -- to make o_2 as a sequence
+						
+			o_1.connector_id <- 'Implies_' + thisModule.ListOfConnectorsForComponents.get(s.F_From) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+				-> collect(k | k ) 
+				-> first().transition_name + '__________' +o_4.transition_name;
+		
+		
+			thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+			
+			o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+
+			thisModule.elementsMap.get(s.F_to.parent_name).connectors <-Set{o_4};
+			thisModule.elementsMap.get(s.F_to.parent_name).guards <- Set{o_5};
+			--thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(thisModule.elementsMap.get(s.F_to.parent_name), o_4);
+			
+			thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s.F_to.parent_name, thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) -> union(Sequence{o_4}) ); -- , thisModule.resolveTemp(s.linkToClassB, 'o_4')
+			
+			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+			--o_1.connector_id <- 'asdasdsadadadadasdasd';
+			thisModule.Connectors_set <- thisModule.Connectors_set -> including(o_1);
+			
+		}
+}
+ 
+ 
+ rule ConstraintsImpliesTo_EnforceablePorts_AND_to_OR{  -- and to or
+	from 
+		s:Feature_MM!Implies ( s.F_From.isExclusive and not s.F_to.isExclusive)
+	to 
+
+		o_1 : JavaBIP_MM!Connector_Motif (
+			connector_id <- 'Implies_' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+			-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+			-> collect(k | k ) 
+			-> first().transition_name + '__________' +thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name) 
+			-> select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+			-> collect(k | k ) 
+			-> first().transition_name 
+			
+		),
+		o_2: JavaBIP_MM!Synchron(		
+			one_enforceable <- thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+			-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+			-> collect(k | k ) 
+			-> first(),
+			
+			
+			description <- 'this is the port of the component: ' + s.F_From.parent_name.name + ' from state :' + 
+				thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+				-> collect(k | k )-> first().src.state_name +' to state :' +
+				thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+				-> collect(k | k )-> first().dst.state_name	
+		),
+		o_4:  JavaBIP_MM!Enforceable(
+			transition_name <- 	s.F_to.name +'_to_' + s.F_to.name,
+		 -- o_4.transition_name <- thisModule.ListOfConnectorsForComponents.get(s.F_to.parent_name)-> collect(k | k.transition_name ).toString();
+			
+			src <- thisModule.ListOfConnectorsForComponents.get(s.F_to)
+				->select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k )
+				-> first().dst,
+			dst <- thisModule.ListOfConnectorsForComponents.get(s.F_to)
+				->select(l | l.transition_name = ('init_to_'+s.F_to.name) )
+				-> collect(k | k )
+				-> first().dst
+			
+			
+		),
+		o_3: JavaBIP_MM!Trigger(
+			one_enforceable <- o_4,
+
+			description <- 'this is the port of the component: ' + s.F_to.name + 
+				' from state :' + o_4.src.state_name +' to state :' +o_4.src.state_name
+			
+		),
+		o_5: JavaBIP_MM!Guard(
+			name <- 'Implies___srcComponent:'+   s.F_From.parent_name.name+'___dstComponnt:'+ s.F_to.name,
+			guardMethod <- 'srcFeature:'+   s.F_From.name + '___dstFeature:' + s.F_to.name+ '___srcTransition:'+thisModule.elementsMap.get(s.F_From.parent_name).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				-> collect(e | e) 
+				-> first().transition_name + '___dstTransition:'+ o_4.transition_name 
+		
+		)
+		do{ -- to make o_2 as a sequence
+			
+			
+			
+			o_1.connector_id <- 'Implies_' + thisModule.ListOfConnectorsForComponents.get(s.F_From.parent_name) 
+				-> select(l | l.transition_name = ('init_to_'+s.F_From.name) )
+				-> collect(k | k ) 
+				-> first().transition_name + '__________' +o_4.transition_name;
+		
+			thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+			
+		
+			o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+			
+			
+			thisModule.elementsMap.get(s.F_to).connectors <-Set{o_4};
+			thisModule.elementsMap.get(s.F_to).guards <- Set{o_5};
+			--thisModule.AllPortsLeadsToStateX  <- thisModule.AllPortsLeadsToStateX->including(thisModule.elementsMap.get(s.F_to.parent_name), o_4);
+			
+			thisModule.ListOfConnectorsForComponents <- thisModule.ListOfConnectorsForComponents->including(s.F_to, thisModule.ListOfConnectorsForComponents.get(s.F_to) -> union(Sequence{o_4}) ); -- , thisModule.resolveTemp(s.linkToClassB, 'o_4')
+			
+			
+			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+			thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+			--o_1.connector_id <- 'asdasdsadadadadasdasd';
+			thisModule.Connectors_set <- thisModule.Connectors_set -> including(o_1);
+			
+		}
+}
+
 rule bam_to_bam(s: String) { -- a way to create components in the target model without a  source
    to
      p : JavaBIP_MM!Component (
        name <- thisModule.ListOfConnectorsForComponents.toString()
      )
  }
+
+ rule ConstraintsExclude{  
+	from 
+		s:Feature_MM!Exclude 
+	to 
+
+		o_1 : JavaBIP_MM!Connector_Motif (
+			connector_id <- 'Exclude_'
+		),
+		o_2: JavaBIP_MM!Synchron(		
+	
+		),
+		o_3: JavaBIP_MM!Trigger(
+		),
+		o_4: JavaBIP_MM!Guard(
+			
+			
+		
+		)
+		do
+		{
+			if(not s.F_From.isExclusive and s.F_to.isExclusive ){ -- or to and 
+				-- o_1.connector_id <- o_1.connector_id + ' kol 5ara ';
+				o_1.connector_id <- o_1.connector_id + thisModule.elementsMap.get(s.F_From).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> collect(o | o.transition_name)
+					-> first() + '__________' +thisModule.elementsMap.get(s.F_to.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name) 
+					-> collect(o | o.transition_name) 
+					-> first();
+				
+				o_2.one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> first();
+				o_2.description <- 'I don\'t create a motif but I leave it now for future decision ';
+				
+				o_3.one_enforceable <- thisModule.elementsMap.get(s.F_to.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name) 
+					-> first();
+				o_3.description <- 'I don\'t create a motif but I leave it now for future decision ';
+				
+				o_4.name <- 'Exclude___srcComponent:'+   s.F_From.name+'___dstComponnt:'+ s.F_to.parent_name.name;
+				o_4.guardMethod <- 'srcFeature:'+   s.F_From.name + '___dstFeature:' + s.F_to.name+ '___srcTransition:'+thisModule.elementsMap.get(s.F_From).connectors 
+				-> select(e | e.dst.state_name = s.F_From.name) 
+				-> collect(e | e) 
+				-> first().transition_name + 
+				'___dstTransition:' + thisModule.elementsMap.get(s.F_to.parent_name).connectors 
+				-> select(e | e.dst.state_name = s.F_to.name) 
+				-> collect(e | e) 
+				-> first().transition_name;
+				
+				
+				thisModule.elementsMap.get(s.F_to.parent_name).guards <- Set{o_4}; -- set the guard 
+				
+				thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+				o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+				thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+				thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+				
+					
+			}
+			else if( s.F_From.isExclusive and not s.F_to.isExclusive ){ -- and to or 
+				
+
+				o_1.connector_id <- o_1.connector_id + thisModule.elementsMap.get(s.F_From.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> collect(o | o.transition_name) 
+					-> first() + '__________' +thisModule.elementsMap.get(s.F_to).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name) 
+					-> collect(o | o.transition_name) 
+					-> first();
+				
+				o_2.one_enforceable <- thisModule.elementsMap.get(s.F_From.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> first();
+				o_2.description <- 'I don\'t create a motif but I leave it now for future decision ';
+				
+				o_3.one_enforceable <- thisModule.elementsMap.get(s.F_to).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name) 
+					-> first();
+				o_3.description <- 'I don\'t create a motif but I leave it now for future decision ';
+				
+				o_4.name <- 'Exclude___srcComponent:'+   s.F_From.parent_name.name+'___dstComponnt:'+ s.F_to.name;
+				o_4.guardMethod <- 'srcFeature:'+   s.F_From.name + '___dstFeature:' + s.F_to.name+ '___srcTransition:'
+					+ thisModule.elementsMap.get(s.F_From.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> collect(k | k.transition_name)
+					-> first()+ '___dstTransition:'+ thisModule.elementsMap.get(s.F_to).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name)
+					-> collect(k | k.transition_name)
+					-> first();
+				
+				
+				thisModule.elementsMap.get(s.F_to).guards <- Set{o_4}; -- set the guard 
+				
+				thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+				o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+				thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+				thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+			
+			
+			}
+			else if(not s.F_From.isExclusive and not s.F_to.isExclusive ){ -- or to or 
+				o_1.connector_id <- o_1.connector_id + thisModule.elementsMap.get(s.F_From).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> collect(o | o.transition_name) 
+					-> first() + '__________' +thisModule.elementsMap.get(s.F_to).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name) 
+					-> collect(o | o.transition_name) 
+					-> first();
+				
+				o_2.one_enforceable <- thisModule.elementsMap.get(s.F_From).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> first();
+				o_2.description <- 'I don\'t create a motif but I leave it now for future decision ';
+				
+				o_3.one_enforceable <- thisModule.elementsMap.get(s.F_to).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name) 
+					-> first();
+				o_3.description <- 'I don\'t create a motif but I leave it now for future decision ';
+
+				
+				o_4.name <- 'Exclude___srcComponent:'+   s.F_From.name+'___dstComponnt:'+ s.F_to.name;
+				o_4.guardMethod <- 'srcFeature:'+   s.F_From.name + '___dstFeature:' + s.F_to.name+ '___srcTransition:'
+					+ thisModule.elementsMap.get(s.F_From).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> collect(k | k.transition_name)
+					-> first()+ '___dstTransition:'+ thisModule.elementsMap.get(s.F_to).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name)
+					-> collect(k | k.transition_name)
+					-> first();
+				
+				
+				thisModule.elementsMap.get(s.F_to).guards <- Set{o_4}; -- set the guard 
+				
+				thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+				o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+				thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+				thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+			
+			}
+			else if( s.F_From.isExclusive and s.F_to.isExclusive ){ -- or to or 
+				
+				o_1.connector_id <- o_1.connector_id + thisModule.elementsMap.get(s.F_From.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> collect(o | o.transition_name) 
+					-> first() + '__________' +thisModule.elementsMap.get(s.F_to.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name) 
+					-> collect(o | o.transition_name) 
+					-> first();
+				
+				o_2.one_enforceable <- thisModule.elementsMap.get(s.F_From.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> first();
+				o_2.description <- 'I don\'t create a motif but I leave it now for future decision ';
+				
+				o_3.one_enforceable <- thisModule.elementsMap.get(s.F_to.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name) 
+					-> first();
+				o_3.description <- 'I don\'t create a motif but I leave it now for future decision ';
+				
+				o_4.name <- 'Exclude___srcComponent:'+   s.F_From.parent_name.name+'___dstComponnt:'+ s.F_to.parent_name.name;
+				o_4.guardMethod <- 'srcFeature:'+   s.F_From.name + '___dstFeature:' + s.F_to.name+ '___srcTransition:'
+					+ thisModule.elementsMap.get(s.F_From.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_From.name) 
+					-> collect(k | k.transition_name)
+					-> first()+ '___dstTransition:'+ thisModule.elementsMap.get(s.F_to.parent_name).connectors 
+					-> select(e | e.dst.state_name = s.F_to.name)
+					-> collect(k | k.transition_name)
+					-> first();
+				
+				
+				thisModule.elementsMap.get(s.F_to.parent_name).guards <- Set{o_4}; -- set the guard 
+				
+				thisModule.MakeSet <-  thisModule.MakeSet -> including(o_2);
+				o_1.ends <- thisModule.MakeSet -> union(Set{o_3});
+				thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_2);			
+				thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_3);
+			}    
+			
+			
+			thisModule.Connectors_set <- thisModule.Connectors_set -> including(o_1);
+		}
+
+		
+}
+
+
+
 
 
 
@@ -351,6 +899,7 @@ rule FeatureModelToJavaBIP {
 			components <- thisModule.Components_set,
 			connector_motifs <- thisModule.Connectors_set
 		)
+		
 }
 
 

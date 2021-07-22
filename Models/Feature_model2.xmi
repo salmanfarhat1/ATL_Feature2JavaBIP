@@ -7,9 +7,13 @@
     xsi:schemaLocation="https://fr.wikipedia.org/wiki/Feature_model ../MetaModels/Feature_MM.ecore">
   <root name="Mobile_Phone">
     <SubFeatures
-        name="Calls"/>
+        xsi:type="Alternative"
+        name="GPS"
+        optional="true"/>
     <SubFeatures
-        name="Media">
+        xsi:type="Alternative"
+        name="Media"
+        optional="true">
       <SubFeatures
           xsi:type="Alternative"
           name="Camera"/>
@@ -18,6 +22,7 @@
           name="MP3"/>
     </SubFeatures>
     <SubFeatures
+        xsi:type="Alternative"
         name="Screen">
       <SubFeatures
           xsi:type="Exclusive"
@@ -30,15 +35,10 @@
           name="High_Resolution"/>
     </SubFeatures>
     <SubFeatures
-        name="GPS"
-        optional="true"/>
+        name="Calls"/>
   </root>
   <constraints
       xsi:type="Implies"
       F_From="//@root/@SubFeatures.1/@SubFeatures.0"
       F_to="//@root/@SubFeatures.2/@SubFeatures.2"/>
-  <constraints
-      xsi:type="Exclude"
-      F_From="//@root/@SubFeatures.3"
-      F_to="//@root/@SubFeatures.2/@SubFeatures.0"/>
 </Feature_model>

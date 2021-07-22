@@ -24,6 +24,18 @@
         <element xmi:type="ecore:EAttribute" href="JavaBIP_MM.ecore#//Component/name"/>
         <layoutConstraint xmi:type="notation:Location" xmi:id="_oxkKQaZvEeulco_Oa2K7rQ"/>
       </children>
+      <children xmi:type="notation:Node" xmi:id="_KiIjQNEZEeu3ScO3o0_ueQ" type="3001">
+        <element xmi:type="ecore:EAttribute" href="JavaBIP_MM.ecore#//Component/optional"/>
+        <layoutConstraint xmi:type="notation:Location" xmi:id="_KiIjQdEZEeu3ScO3o0_ueQ"/>
+      </children>
+      <children xmi:type="notation:Node" xmi:id="_A-FCgNTcEeuQ5rc18Bem0w" type="3001">
+        <element xmi:type="ecore:EAttribute" href="JavaBIP_MM.ecore#//Component/usableComponent"/>
+        <layoutConstraint xmi:type="notation:Location" xmi:id="_A-FCgdTcEeuQ5rc18Bem0w"/>
+      </children>
+      <children xmi:type="notation:Node" xmi:id="_j9cDEOn-EeueSeNKWtQGww" type="3001">
+        <element xmi:type="ecore:EAttribute" href="JavaBIP_MM.ecore#//Component/correspondsTo"/>
+        <layoutConstraint xmi:type="notation:Location" xmi:id="_j9cDEen-EeueSeNKWtQGww"/>
+      </children>
       <styles xmi:type="notation:SortingStyle" xmi:id="_nMfC1KZvEeulco_Oa2K7rQ"/>
       <styles xmi:type="notation:FilteringStyle" xmi:id="_nMfC1aZvEeulco_Oa2K7rQ"/>
     </children>
@@ -36,7 +48,7 @@
       <styles xmi:type="notation:FilteringStyle" xmi:id="_nMfC26ZvEeulco_Oa2K7rQ"/>
     </children>
     <element xmi:type="ecore:EClass" href="JavaBIP_MM.ecore#//Component"/>
-    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_nMfC0aZvEeulco_Oa2K7rQ" x="217" y="144" width="98" height="66"/>
+    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_nMfC0aZvEeulco_Oa2K7rQ" x="217" y="128" width="98" height="81"/>
   </children>
   <children xmi:type="notation:Shape" xmi:id="_UBcOkKdREeulco_Oa2K7rQ" type="2001" fontName=".AppleSystemUIFont">
     <children xmi:type="notation:DecorationNode" xmi:id="_UBcOkqdREeulco_Oa2K7rQ" type="5001"/>
@@ -231,6 +243,31 @@
     <element xmi:type="ecore:EClass" href="JavaBIP_MM.ecore#//Trigger"/>
     <layoutConstraint xmi:type="notation:Bounds" xmi:id="_FJ7sAa3ZEeuLzeHLhAjZXw" x="873" y="296"/>
   </children>
+  <children xmi:type="notation:Shape" xmi:id="_Ylw8sNpGEeuGU7Ke0VQWng" type="2001" fontName=".AppleSystemUIFont">
+    <children xmi:type="notation:DecorationNode" xmi:id="_YlxjwNpGEeuGU7Ke0VQWng" type="5001"/>
+    <children xmi:type="notation:BasicCompartment" xmi:id="_YlxjwdpGEeuGU7Ke0VQWng" type="7001">
+      <children xmi:type="notation:Node" xmi:id="_Z6JVsNpGEeuGU7Ke0VQWng" type="3001">
+        <element xmi:type="ecore:EAttribute" href="JavaBIP_MM.ecore#//Guard/name"/>
+        <layoutConstraint xmi:type="notation:Location" xmi:id="_Z6JVsdpGEeuGU7Ke0VQWng"/>
+      </children>
+      <children xmi:type="notation:Node" xmi:id="_c6DcYNpGEeuGU7Ke0VQWng" type="3001">
+        <element xmi:type="ecore:EAttribute" href="JavaBIP_MM.ecore#//Guard/guardMethod"/>
+        <layoutConstraint xmi:type="notation:Location" xmi:id="_c6DcYdpGEeuGU7Ke0VQWng"/>
+      </children>
+      <styles xmi:type="notation:SortingStyle" xmi:id="_YlxjwtpGEeuGU7Ke0VQWng"/>
+      <styles xmi:type="notation:FilteringStyle" xmi:id="_Ylxjw9pGEeuGU7Ke0VQWng"/>
+    </children>
+    <children xmi:type="notation:BasicCompartment" xmi:id="_YlxjxNpGEeuGU7Ke0VQWng" type="7002">
+      <styles xmi:type="notation:SortingStyle" xmi:id="_YlxjxdpGEeuGU7Ke0VQWng"/>
+      <styles xmi:type="notation:FilteringStyle" xmi:id="_YlxjxtpGEeuGU7Ke0VQWng"/>
+    </children>
+    <children xmi:type="notation:BasicCompartment" xmi:id="_Ylxjx9pGEeuGU7Ke0VQWng" type="7003">
+      <styles xmi:type="notation:SortingStyle" xmi:id="_YlxjyNpGEeuGU7Ke0VQWng"/>
+      <styles xmi:type="notation:FilteringStyle" xmi:id="_YlxjydpGEeuGU7Ke0VQWng"/>
+    </children>
+    <element xmi:type="ecore:EClass" href="JavaBIP_MM.ecore#//Guard"/>
+    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_Ylw8sdpGEeuGU7Ke0VQWng" x="76" y="16"/>
+  </children>
   <styles xmi:type="notation:DiagramStyle" xmi:id="_t-NDsaZuEeulco_Oa2K7rQ"/>
   <element xmi:type="ecore:EPackage" href="JavaBIP_MM.ecore#/"/>
   <edges xmi:type="notation:Connector" xmi:id="_sXS60KZvEeulco_Oa2K7rQ" type="4003" source="_ku7bQKZvEeulco_Oa2K7rQ" target="_nMfC0KZvEeulco_Oa2K7rQ">
@@ -346,7 +383,7 @@
     </children>
     <styles xmi:type="notation:FontStyle" xmi:id="_UF_REa3YEeuLzeHLhAjZXw" fontName=".AppleSystemUIFont"/>
     <element xmi:type="ecore:EReference" href="JavaBIP_MM.ecore#//Java_BIP_project/connector_motifs"/>
-    <bendpoints xmi:type="notation:RelativeBendpoints" xmi:id="_UF_REq3YEeuLzeHLhAjZXw" points="[53, 0, -261, -50]$[314, 0, 0, -50]$[314, 24, 0, -26]"/>
+    <bendpoints xmi:type="notation:RelativeBendpoints" xmi:id="_UF_REq3YEeuLzeHLhAjZXw" points="[53, 0, -278, -53]$[331, 0, 0, -53]$[331, 24, 0, -29]"/>
   </edges>
   <edges xmi:type="notation:Connector" xmi:id="_tWym8K3YEeuLzeHLhAjZXw" type="4003" source="_HgM1QK3YEeuLzeHLhAjZXw" target="_nz4YAK3YEeuLzeHLhAjZXw">
     <children xmi:type="notation:DecorationNode" xmi:id="_tWym863YEeuLzeHLhAjZXw" type="6002">
@@ -394,5 +431,17 @@
     <bendpoints xmi:type="notation:RelativeBendpoints" xmi:id="_ekZUMq3ZEeuLzeHLhAjZXw" points="[-7, -3, -119, 150]$[-7, -141, -119, 12]$[112, -141, 0, 12]$[112, -151, 0, 2]"/>
     <sourceAnchor xmi:type="notation:IdentityAnchor" xmi:id="_ekaiUK3ZEeuLzeHLhAjZXw" id="(0.9444444444444444,0.057692307692307696)"/>
     <targetAnchor xmi:type="notation:IdentityAnchor" xmi:id="_ekaiUa3ZEeuLzeHLhAjZXw" id="(0.10619469026548672,0.9615384615384616)"/>
+  </edges>
+  <edges xmi:type="notation:Connector" xmi:id="_klwj0NpGEeuGU7Ke0VQWng" type="4003" source="_nMfC0KZvEeulco_Oa2K7rQ" target="_Ylw8sNpGEeuGU7Ke0VQWng">
+    <children xmi:type="notation:DecorationNode" xmi:id="_klxK4NpGEeuGU7Ke0VQWng" type="6002">
+      <layoutConstraint xmi:type="notation:Location" xmi:id="_klxK4dpGEeuGU7Ke0VQWng" x="-8" y="37"/>
+    </children>
+    <children xmi:type="notation:DecorationNode" xmi:id="_klxK4tpGEeuGU7Ke0VQWng" type="6004">
+      <layoutConstraint xmi:type="notation:Location" xmi:id="_klxK49pGEeuGU7Ke0VQWng" x="-10" y="38"/>
+    </children>
+    <styles xmi:type="notation:FontStyle" xmi:id="_klwj0dpGEeuGU7Ke0VQWng" fontName=".AppleSystemUIFont"/>
+    <element xmi:type="ecore:EReference" href="JavaBIP_MM.ecore#//Component/guards"/>
+    <bendpoints xmi:type="notation:RelativeBendpoints" xmi:id="_klwj0tpGEeuGU7Ke0VQWng" points="[-13, -11, 128, 83]$[-50, -97, 91, -3]"/>
+    <sourceAnchor xmi:type="notation:IdentityAnchor" xmi:id="_klznINpGEeuGU7Ke0VQWng" id="(0.09183673469387756,0.14814814814814814)"/>
   </edges>
 </notation:Diagram>
