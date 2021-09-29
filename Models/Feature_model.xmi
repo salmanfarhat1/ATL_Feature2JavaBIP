@@ -32,11 +32,21 @@
     <SubFeatures
         name="GPS"
         optional="true"/>
+    <SubFeatures
+        name="test"
+        optional="true">
+      <SubFeatures
+          xsi:type="Exclusive"
+          name="x"/>
+      <SubFeatures
+          xsi:type="Exclusive"
+          name="y"/>
+    </SubFeatures>
   </root>
   <constraints
       xsi:type="Implies"
       F_From="//@root/@SubFeatures.1/@SubFeatures.0"
-      F_to="//@root/@SubFeatures.2/@SubFeatures.2"/>
+      F_to="//@root/@SubFeatures.1/@SubFeatures.1"/>
   <constraints
       xsi:type="Exclude"
       F_From="//@root/@SubFeatures.3"
