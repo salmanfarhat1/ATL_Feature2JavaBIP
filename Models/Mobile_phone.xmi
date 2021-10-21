@@ -35,6 +35,10 @@
   </root>
   <constraints
       xsi:type="Implies"
-      F_From="//@root/@SubFeatures.2/@SubFeatures.1"
-      F_to="//@root/@SubFeatures.1/@SubFeatures.0"/>
+      F_From="//@root/@SubFeatures.1/@SubFeatures.0"
+      F_to="//@root/@SubFeatures.2/@SubFeatures.2"/>
+  <constraints
+      xsi:type="Exclude"
+      F_From="//@root/@SubFeatures.3"
+      F_to="//@root/@SubFeatures.2/@SubFeatures.0"/>
 </Feature_model>

@@ -5,36 +5,32 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xmlns="https://fr.wikipedia.org/wiki/Feature_model"
     xsi:schemaLocation="https://fr.wikipedia.org/wiki/Feature_model ../MetaModels/Feature_MM.ecore">
-  <root name="Mobile_Phone">
+  <root name="RandomFM">
     <SubFeatures
-        name="Calls"/>
-    <SubFeatures
-        name="Media">
+        name="f3f">
       <SubFeatures
-          xsi:type="Alternative"
-          name="Camera"/>
+          xsi:type="Exclusive"
+          name="f4f"/>
       <SubFeatures
-          xsi:type="Alternative"
-          name="MP3"/>
+          xsi:type="Exclusive"
+          name="f5f"/>
     </SubFeatures>
     <SubFeatures
-        name="Screen">
+        name="f7f">
       <SubFeatures
           xsi:type="Exclusive"
-          name="Basic"/>
+          name="f8f"/>
       <SubFeatures
           xsi:type="Exclusive"
-          name="Colour"/>
+          name="f9f"/>
       <SubFeatures
           xsi:type="Exclusive"
-          name="High_Resolution"/>
+          name="f6f"/>
     </SubFeatures>
     <SubFeatures
-        name="GPS"
-        optional="true"/>
+        name="f2f">
+      <SubFeatures
+          name="f1f"/>
+    </SubFeatures>
   </root>
-  <constraints
-      xsi:type="Implies"
-      F_From="//@root/@SubFeatures.2/@SubFeatures.1"
-      F_to="//@root/@SubFeatures.1/@SubFeatures.0"/>
 </Feature_model>

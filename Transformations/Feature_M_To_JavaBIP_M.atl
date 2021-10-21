@@ -274,6 +274,12 @@ rule FeatureToComponent_not_leaf {
    		thisModule.filteredStates <- thisModule.filteredStates -> including(s, Sequence{o_2});
    		if(s.isExclusive and s.SubFeatures -> first().isAlternativeBoolean){
    			thisModule.CreateGuard_lazyrule(s);
+   		} 		
+  		else if(s.isExclusive and not s.SubFeatures -> first().isExclusive){ -- if it is a normal feature it is the same case. 
+   			thisModule.CreateGuard_lazyrule(s);
+   		}
+   		else if(s.isExclusive and s.SubFeatures -> first().isExclusive){ -- if it is Exclusive same idea
+   			thisModule.CreateGuard_lazyrule_Exclusive_case(s);
    		}
  	}
 }
@@ -334,31 +340,188 @@ rule FeatureToComponent_not_leaf {
 		
  }
  
-  rule CreateTriggersEndForTheConnectorMotif(s: Feature_MM!Feature ) { -- a way to create components in the target model without a  source
-   to 
-		o_21 : JavaBIP_MM!Trigger ( 
+ rule CreateGuard_lazyrule_Exclusive_case(s: Feature_MM!Feature ) { -- this is an exclusive feature that have sub features in adition
+   to -- s = exclusive feature that means the component will be the parent (s = preformance tier)
+	
+ 		o_4:  JavaBIP_MM!Enforceable(	-- to create the looping transition on the F_to feature
+		),
+ 		o_11 : JavaBIP_MM!Connector_Motif(
 			
-		) -- I want to catch the not an set them into a trigger and then save them in helper to add them ---- not_PerformanceM_Hierarchical_PerformanceM_Dyno
+		),
+		o_21 : JavaBIP_MM!Trigger ( 
+				
+		),
+		o_31: JavaBIP_MM!Trigger(			-- ends of the motif the transition necessary to be part of the glue spec (transition leads to the end feature)
+		),
+		o_41:  JavaBIP_MM!Enforceable(	-- to create the looping transition on the F_to feature
+		),
+		o_51 : JavaBIP_MM!Guard ( 
+			
+		)
+
 		do{
---			o_21.one_enforceable <- thisModule.elementsMap.get(s).connectors
---				-> select(e | e.transition_name = 'not_' + s.name + '_Hierarchical_'+s.name+'_'+s.parent_name.parent_name.name) 
---				->collect(e | e) 
---				-> first();
-			o_21.description <- s.name;
---			o_21.description <- 'This is the port of the component: ' + thisModule.elementsMap.get(s).name +
---				' from state :' + thisModule.elementsMap.get(s).connectors -- taking the reset transition in the parent of the parent 
---				-> select(e | e.transition_name = 'not_' + s.name + '_Hierarchical_'+s.name+'_'+s.parent_name.parent_name.name) 
---				->collect(e | e) 
---				-> first().src.state_name +' to state :' + thisModule.elementsMap.get(s).connectors -- taking the reset transition in the parent of the parent 
---				-> select(e | e.transition_name = 'not_' + s.name + '_Hierarchical_'+s.name+'_'+s.parent_name.parent_name.name) 
---				->collect(e | e) 
---				-> first().dst.state_name;
+			o_41.transition_name <- 'Off_' + s.name + '_Hierarchical_'+s.name + '_'+s.parent_name.name; -- Creating the looping transition on all starts of the F_From component 	
+			o_41.src <- thisModule.elementsMap.get(s).initial_s;
+			o_41.dst <- thisModule.elementsMap.get(s).initial_s;
+			
+			thisModule.elementsMap.get(s).connectors <- Set{o_41};
+			thisModule.ListOfConnectorsForComponents_V2 <- thisModule.ListOfConnectorsForComponents_V2->including(s, thisModule.ListOfConnectorsForComponents_V2.get(s) -> union(Sequence{o_41}) ); 
+				
+			o_31.one_enforceable <- o_41;
+			o_31.description <- 'This is the port of the component: ' + s.name + ' from state :'
+				+ o_41.src.state_name +' to state :' + o_41.dst.state_name;
+	
+			
+			o_21.one_enforceable <- thisModule.elementsMap.get(s.parent_name).connectors -- taking the reset transition in the parent of the parent 
+				-> select(e | e.transition_name = s.name + '_reset') 
+				->collect(e | e) 
+				-> first();
+
+			o_21.description <- 'This is the port of the component: ' + thisModule.elementsMap.get(s.parent_name).name +
+				' from state :' + thisModule.elementsMap.get(s.parent_name).connectors 
+				-> select(e |e.transition_name = (s.name + '_reset') ) 
+				-> collect(e | e) 
+				-> first().src.state_name +' to state :' + thisModule.elementsMap.get(s.parent_name).connectors 
+				-> select(e |e.transition_name = (s.name + '_reset') ) 
+				-> collect(e | e)  
+				-> first().dst.state_name;
+					
+			o_51.name <- 'Hierarchical___srcComponent:'+   s.parent_name.name + '___dstComponnt:' + s.name ;
+			
+
+			o_51.guardMethod <- 'srcFeature:'+   s.name + '___dstFeature:SubFeatures' + '___srcTransition:' + thisModule.elementsMap.get(s.parent_name).connectors 
+				-> select(e | e.transition_name = (s.name + '_reset')) 
+				->collect(e | e) 
+				-> first().transition_name  +  '___dstTransition:SubFeatures';
+			
+			
+					
+			o_11.connector_id <- 'Hierarchical_' + thisModule.ListOfConnectorsForComponents_V2.get(s.parent_name) 
+				-> select(l | l.transition_name = (s.name + '_reset') )
+				-> collect(k | k ) 
+				-> first().transition_name;
+			
+			
+			-- thisModule.listOfEndsForConnector_reset  <- thisModule.listOfEndsForConnector_reset->including(s, o_11);
+			-- thisModule.listOfEndsForConnector_reset.get(s).ends <- Set{o_21};
+			o_11.ends <- o_11.ends -> including(o_21);
+			o_11.ends <- o_11.ends -> including(o_31);
+			--thisModule.MakeSet <-  thisModule.MakeSet -> including(o_21);
+			--o_11.ends <- thisModule.MakeSet -> union(Set{o_31});
+			--thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_21);			
+			--thisModule.MakeSet <- thisModule.MakeSet -> excluding(o_31);
+			
+			
+			thisModule.elementsMap.get(s.parent_name).guards <- Set{o_51};
+			thisModule.Connectors_set <- thisModule.Connectors_set -> including(o_11);
+			
+			o_4.transition_name <- 	thisModule.ListOfConnectorsForComponents_V2.get(s.parent_name)
+					->select(l | l.transition_name = s.name )
+					-> collect(k | k )
+					-> first().dst.state_name +'_to_' +thisModule.ListOfConnectorsForComponents_V2.get(s.parent_name)
+					->select(l | l.transition_name = s.name )
+					-> collect(k | k )
+					-> first().dst.state_name+'_ID_'+ s.name + '_'+ s.parent_name.name + '_Exclusive' ; -- creating a looping transition in the parent of the parent component  from perf to perf
+			
+			o_4.src <- thisModule.ListOfConnectorsForComponents_V2.get(s.parent_name)
+					->select(l | l.transition_name = s.name )
+					-> collect(k | k )
+					-> first().dst;
+			o_4.dst <- thisModule.ListOfConnectorsForComponents_V2.get(s.parent_name)
+				->select(l | l.transition_name = s.name )
+				-> collect(k | k )
+				-> first().dst;
+				
+			thisModule.elementsMap.get(s.parent_name).connectors <- Set{o_4};
+			thisModule.ListOfConnectorsForComponents_V2 <- thisModule.ListOfConnectorsForComponents_V2->including(s.parent_name, thisModule.ListOfConnectorsForComponents_V2.get(s.parent_name) -> union(Sequence{o_41}) ); 
+				
+	
+			for(r in s.SubFeatures ) {
+				--o_1.connector_id <- thisModule.elementsMap.get(s.F_From).connectors -> size().toString();
+				thisModule.CreateResetConnectorsForExclusiveFeatures(r);
+			}
+		}
+		
+		
+ }
+
+  rule CreateResetConnectorsForExclusiveFeatures(s: Feature_MM!Feature ) { -- a way to create components in the target model without a  source
+   to 	o_1 : JavaBIP_MM!Connector_Motif(
+			
+		),
+		o_2 : JavaBIP_MM!Trigger ( 
+			
+		), -- I want to catch the not an set them into a trigger and then save them in helper to add them ---- not_PerformanceM_Hierarchical_PerformanceM_Dyno
+		o_3 : JavaBIP_MM!Trigger ( 
+			
+		),
+		o_5: JavaBIP_MM!Guard(			-- set the guard specifications in the source component
+		)
+		do{
+			o_2.one_enforceable <- thisModule.elementsMap.get(s.parent_name).connectors
+				-> select(e | e.transition_name = s.name) 
+				->collect(e | e) 
+				-> first();
+		
+			o_2.description <- 'This is the port of the component: ' + thisModule.elementsMap.get(s.parent_name).name +
+				' from state :' + thisModule.elementsMap.get(s.parent_name).connectors -- taking the reset transition in the parent of the parent 
+				-> select(e | e.transition_name = s.name) 
+				-> collect(e | e) 
+				-> first().src.state_name +' to state :' +thisModule.elementsMap.get(s.parent_name).connectors-- taking the reset transition in the parent of the parent 
+				-> select(e | e.transition_name = s.name)  
+				-> collect(e | e) 
+				-> first().dst.state_name;
+			--name to name ID name parent name Exclusive
+			--InteractiveRadar_to_InteractiveRadar_ID_InteractiveRadar_Radar_Exclusive
+	
+			o_3.one_enforceable <- thisModule.elementsMap.get(s.parent_name.parent_name).connectors
+				-> select(e | e.transition_name = s.parent_name.name +'_to_' +s.parent_name.name  
+					+ '_ID_' + s.parent_name.name 	+'_' +s.parent_name.parent_name.name +'_Exclusive' ) 
+				-> collect(e | e) 
+				-> first();
+			o_3.description <- 'This is the port of the component: ' + thisModule.elementsMap.get(s.parent_name.parent_name).name +
+				' from state :' + thisModule.elementsMap.get(s.parent_name.parent_name).connectors
+				-> select(e | e.transition_name = s.parent_name.name +'_to_' +s.parent_name.name  
+					+ '_ID_' + s.parent_name.name 	+'_' +s.parent_name.parent_name.name +'_Exclusive' ) 
+				-> collect(e | e) 
+				-> first().src.state_name +' to state :' +thisModule.elementsMap.get(s.parent_name.parent_name).connectors
+				-> select(e | e.transition_name = s.parent_name.name +'_to_' +s.parent_name.name  
+					+ '_ID_' + s.parent_name.name 	+'_' +s.parent_name.parent_name.name +'_Exclusive' ) 
+				-> collect(e | e) 
+				-> first().dst.state_name;
+			
+			o_5.name <- 'Hierarchical___srcComponent:'+   s.parent_name.name+'___dstComponnt:'+ s.parent_name.parent_name.name;
+			o_5.guardMethod <- 'srcFeature:'+   s.name + '___dstFeature:not_impo' + s.parent_name.name +'___srcTransition:'+thisModule.elementsMap.get(s.parent_name).connectors 
+					-> select(e | e.transition_name = s.name) 
+					->collect(e | e) 
+					-> first().transition_name + '___dstTransition:'+ thisModule.elementsMap.get(s.parent_name.parent_name).connectors
+				-> select(e | e.transition_name = s.parent_name.name +'_to_' +s.parent_name.name  
+					+ '_ID_' + s.parent_name.name 	+'_' +s.parent_name.parent_name.name +'_Exclusive' ) 
+				-> collect(e | e) 
+				-> first().transition_name;
+			
+			
+			thisModule.elementsMap.get(s.parent_name).guards <- Set{o_5};	
+			
+			o_1.connector_id <- 'Hierarchical_' +thisModule.elementsMap.get(s.parent_name).connectors
+				-> select(e | e.transition_name = s.name) 
+				->collect(e | e) 
+				-> first().transition_name  + '__________' +thisModule.elementsMap.get(s.parent_name.parent_name).connectors
+				-> select(e | e.transition_name = s.parent_name.name +'_to_' +s.parent_name.name  
+					+ '_ID_' + s.parent_name.name 	+'_' +s.parent_name.parent_name.name +'_Exclusive' ) 
+				-> collect(e | e) 
+				-> first();
+			
+			o_1.ends <- o_1.ends -> including(o_2);
+			o_1.ends <- o_1.ends -> including(o_3);
+			thisModule.Connectors_set <- thisModule.Connectors_set -> including(o_1);
+			
 		}
   }
 
 -- ******************************************* Feature to component if leaf   *********************************************************************************************************
  
-rule FeatureToComponent_leaf {
+rule FeatureToComponent_leaf { -- leaf and not Exclusive
 	from
 		s:Feature_MM!Feature (s.isLeaf() and (not s.isExclusive))
 	to 
@@ -503,7 +666,7 @@ rule FeatureToComponent_leaf {
 					-> first().dst.state_name +'_to_' +thisModule.ListOfConnectorsForComponents_V2.get(pa.parent_name)
 					->select(l | l.transition_name = s.parent_name.name )
 					-> collect(k | k )
-					-> first().dst.state_name+'_ID_'+ s.name + '-'+ pa.parent_name.name; -- creating a looping transition in the parent of the parent component  from perf to perf
+					-> first().dst.state_name+'_ID_'+ s.name + '_'+ pa.parent_name.name; -- creating a looping transition in the parent of the parent component  from perf to perf
 			
 			o_4.src <- thisModule.ListOfConnectorsForComponents_V2.get(pa.parent_name)
 					->select(l | l.transition_name = s.parent_name.name )
@@ -665,7 +828,6 @@ rule FeatureToComponent_leaf {
 		
 		}
  }
-
 
  
 
